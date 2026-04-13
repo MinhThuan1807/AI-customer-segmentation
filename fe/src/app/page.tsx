@@ -1,308 +1,390 @@
-'use client'
-import { useState } from 'react'
-import UploadForm from '@/components/UploadForm'
-import ClusterChart from '@/components/ClusterChart'
-import SegmentTable from '@/components/SegmentTable'
-import StatsBar from '@/components/StatsBar'
+/**
+ * App.tsx
+ * -------
+ * Main entry point for the Customer Segmentation Dashboard.
+ *
+ * UI Flow (3 steps):
+ *  Step 1 — "upload"   → Upload a CSV file or load demo data
+ *  Step 2 — "preview"  → Preview the data table, configure K, run analysis
+ *  Step 3 — "results"  → View scatter plot, elbow chart, cluster cards, and filtered table
+ *
+ * The K-Means algorithm runs entirely in the browser (no backend needed).
+ * In a real production app, you'd POST to /api/cluster and get back labels + centroids.
+ */
 
-interface AnalysisResult {
-  clusters: Array<{
-    CustomerID: number
-    Cluster: number
-    Recency: number
-    Frequency: number
-    Monetary: number
-    x: number
-    y: number
-  }>
-  elbow: number[]
-  k: number
-}
+// ⚠️ Must be first — suppresses browser extension conflicts (window.ethereum redefinition)
+'use client';
+import "./utils/suppressExtensionErrors";
+import React, { useState } from "react";
+import { UploadSection } from "@/components/UploadSection";
+import { DataTable } from "@/components/DataTable";
+import { ClusterConfig } from "@/components/ClusterConfig";
+import { ChartSection } from "@/components/ChartSection";
+import { ClusterResult } from "@/components/ClusterResult";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { runKMeans } from "./utils/kMeans";
+import { downloadCSV } from "./utils/exportCSV";
+import { Download, RotateCcw, BrainCircuit, CheckCircle2, Loader2 } from "lucide-react";
+import type { CustomerData, ClusteringResult } from "./types";
 
-export default function Home() {
-  const [result, setResult] = useState<AnalysisResult | null>(null)
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+// ─────────────────────────────────────────────
+// Step type
+// ─────────────────────────────────────────────
+type Step = "upload" | "preview" | "results";
 
-  const handleAnalyze = async (file: File, k: number) => {
-    setLoading(true)
-    setError(null)
-    setResult(null)
+// ─────────────────────────────────────────────
+// Step indicator component (top progress bar)
+// ─────────────────────────────────────────────
+function StepIndicator({ step }: { step: Step }) {
+  const steps: { id: Step; label: string; num: number }[] = [
+    { id: "upload", label: "Upload Data", num: 1 },
+    { id: "preview", label: "Configure", num: 2 },
+    { id: "results", label: "Results", num: 3 },
+  ];
 
-    try {
-      const form = new FormData()
-      form.append('file', file)
-
-      const res = await fetch(`http://localhost:8000/api/analyze?k=${k}`, {
-        method: 'POST',
-        body: form,
-      })
-
-      if (!res.ok) {
-        const err = await res.json()
-        throw new Error(err.detail ?? 'Lỗi từ server')
-      }
-
-      const data = await res.json()
-      setResult(data)
-    } catch (e: any) {
-      setError(e.message ?? 'Không kết nối được backend. Hãy chắc chắn FastAPI đang chạy ở port 8000.')
-    } finally {
-      setLoading(false)
-    }
-  }
+  const stepOrder: Record<Step, number> = { upload: 0, preview: 1, results: 2 };
+  const currentIdx = stepOrder[step];
 
   return (
-    <div className="page">
-      {/* Google Fonts */}
-      <link
-        href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500;700&family=DM+Sans:wght@400;500;600&display=swap"
-        rel="stylesheet"
-      />
+    <div className="flex items-center gap-0 mb-10">
+      {steps.map((s, i) => {
+        const done = i < currentIdx;
+        const active = i === currentIdx;
+        return (
+          <React.Fragment key={s.id}>
+            {/* Step dot */}
+            <div className="flex flex-col items-center">
+              <div
+                className={`
+                  w-9 h-9 rounded-full flex items-center justify-center text-sm transition-all duration-300
+                  ${done ? "bg-indigo-600 text-white shadow-sm" : ""}
+                  ${active ? "bg-indigo-600 text-white shadow-md ring-4 ring-indigo-100" : ""}
+                  ${!done && !active ? "bg-gray-100 text-gray-400" : ""}
+                `}
+              >
+                {done ? <CheckCircle2 className="w-4 h-4" /> : s.num}
+              </div>
+              <span
+                className={`text-xs mt-1.5 transition-colors ${
+                  active ? "text-indigo-600" : done ? "text-gray-400" : "text-gray-300"
+                }`}
+              >
+                {s.label}
+              </span>
+            </div>
 
-      {/* Header */}
-      <header className="header">
-        <div className="header-inner">
-          <div className="logo">
-            <span className="logo-mark">▣</span>
-            <span className="logo-text">SegmentAI</span>
+            {/* Connector line between steps */}
+            {i < steps.length - 1 && (
+              <div
+                className={`flex-1 h-0.5 mb-5 mx-2 transition-colors duration-300 ${
+                  i < currentIdx ? "bg-indigo-600" : "bg-gray-200"
+                }`}
+              />
+            )}
+          </React.Fragment>
+        );
+      })}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────
+// Stat card for the results summary bar
+// ─────────────────────────────────────────────
+function StatCard({ label, value, sub }: { label: string; value: string; sub?: string }) {
+  return (
+    <div className="flex-1 min-w-0 bg-white rounded-2xl border border-gray-100 shadow-sm px-4 py-3">
+      <p className="text-xs text-gray-400">{label}</p>
+      <p className="text-gray-900 mt-0.5 truncate" title={value}>{value}</p>
+      {sub && <p className="text-xs text-gray-400 mt-0.5">{sub}</p>}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────
+// Main App Component
+// ─────────────────────────────────────────────
+export default function App() {
+  // ── State ──
+  const [step, setStep] = useState<Step>("upload");
+  const [data, setData] = useState<CustomerData[]>([]);
+  const [fileName, setFileName] = useState<string>("");
+  const [kValue, setKValue] = useState<number>(3);
+  const [clusterResults, setClusterResults] = useState<ClusteringResult | null>(null);
+  const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [filterCluster, setFilterCluster] = useState<number | "all">("all");
+  const [loadingMsg, setLoadingMsg] = useState<string>("");
+
+  // ── Step 1 → Step 2: Data loaded ──
+  const handleDataLoaded = (newData: CustomerData[], name: string) => {
+    setData(newData);
+    setFileName(name);
+    setClusterResults(null);
+    setFilterCluster("all");
+    setStep("preview");
+  };
+
+  // ── Step 2 → Step 3: Run K-Means ──
+  // In a real app, this would POST to /api/cluster and await the response.
+  // Here we run K-Means directly in the browser and simulate a loading delay.
+  const handleRunClustering = async () => {
+    setIsLoading(true);
+    setLoadingMsg("Initializing centroids...");
+
+    // Simulate API latency in stages (educational UX)
+    await new Promise((res) => setTimeout(res, 600));
+    setLoadingMsg("Running K-Means iterations...");
+    await new Promise((res) => setTimeout(res, 700));
+    setLoadingMsg("Computing elbow method...");
+    await new Promise((res) => setTimeout(res, 500));
+
+    try {
+      /**
+       * 🔌 BACKEND INTEGRATION POINT
+       * ─────────────────────────────
+       * Replace this block with a real API call:
+       *
+       *   const response = await fetch("/api/cluster", {
+       *     method: "POST",
+       *     headers: { "Content-Type": "application/json" },
+       *     body: JSON.stringify({ data, k: kValue }),
+       *   });
+       *   const results = await response.json();
+       *   // results = { labels: number[], centroids: number[][], elbowData: [...] }
+       *
+       * For now, we run K-Means in the browser:
+       */
+          const response = await fetch("http://127.0.0.1:8000/api/cluster", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ data, k: kValue }),
+          });
+          const results = await response.json();
+          // results = { labels: number[], centroids: number[][], elbowData: [...] }
+       
+      // const results = runKMeans(data, kValue);
+
+      setClusterResults(results);
+      setStep("results");
+    } catch (err) {
+      console.error("Clustering failed:", err);
+    } finally {
+      setIsLoading(false);
+      setLoadingMsg("");
+    }
+  };
+
+  // ── Reset to start ──
+  const handleReset = () => {
+    setStep("upload");
+    setData([]);
+    setFileName("");
+    setClusterResults(null);
+    setFilterCluster("all");
+    setKValue(3);
+  };
+
+  // ── Download CSV with cluster labels ──
+  const handleDownload = () => {
+    if (!clusterResults) return;
+    downloadCSV(data, clusterResults.labels, `segments_k${kValue}_${fileName}`);
+  };
+
+  // ── Derived values ──
+  const numClusters = clusterResults ? Math.max(...clusterResults.labels) + 1 : 0;
+
+  // ─────────────────────────────────────────────
+  // Render
+  // ─────────────────────────────────────────────
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-indigo-50/30">
+      {/* ── Header ── */}
+      <header className="border-b border-gray-100 bg-white/80 backdrop-blur-sm sticky top-0 z-10">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-indigo-600 flex items-center justify-center shadow-sm">
+              <BrainCircuit className="w-5 h-5 text-white" />
+            </div>
+            <div>
+              <h1 className="text-gray-900 leading-tight">
+                Customer Segmentation
+              </h1>
+              <p className="text-xs text-gray-400 hidden sm:block">K-Means Clustering Analysis</p>
+            </div>
           </div>
-          <div className="header-meta">
-            <span className="badge">K-Means Clustering</span>
-            <span className="badge">Unsupervised ML</span>
-          </div>
+
+          {/* Action buttons in header (only in results step) */}
+          {step === "results" && (
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleReset}
+                className="rounded-xl border-gray-200 text-sm gap-1.5"
+              >
+                <RotateCcw className="w-3.5 h-3.5" />
+                New Analysis
+              </Button>
+              <Button
+                size="sm"
+                onClick={handleDownload}
+                className="rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-sm gap-1.5"
+              >
+                <Download className="w-3.5 h-3.5" />
+                Download CSV
+              </Button>
+            </div>
+          )}
         </div>
       </header>
 
-      {/* Main */}
-      <main className="main">
-        {/* Hero */}
-        <div className="hero">
-          <h1 className="hero-title">
-            Phân cụm khách hàng
-            <span className="hero-accent"> thương mại điện tử</span>
-          </h1>
-          <p className="hero-sub">
-            Upload file CSV → Tính RFM → Chạy K-Means → Khám phá các nhóm khách hàng
-          </p>
-        </div>
+      {/* ── Main Content ── */}
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 py-8">
+        {/* Step indicator */}
+        <StepIndicator step={step} />
 
-        {/* Upload */}
-        <UploadForm onAnalyze={handleAnalyze} loading={loading} />
-
-        {/* Error */}
-        {error && (
-          <div className="error-box">
-            <span className="error-icon">⚠</span>
-            <span>{error}</span>
+        {/* ── STEP 1: Upload ── */}
+        {step === "upload" && (
+          <div className="flex flex-col items-center">
+            <div className="text-center mb-8 max-w-xl">
+              <h2 className="text-gray-800 mb-2">Upload Your Customer Data</h2>
+              <p className="text-sm text-gray-400">
+                Upload a CSV file with customer records, or use our 200-customer demo dataset
+                to explore the full K-Means clustering pipeline instantly.
+              </p>
+            </div>
+            <div className="w-full max-w-2xl">
+              <UploadSection onDataLoaded={handleDataLoaded} />
+            </div>
           </div>
         )}
 
-        {/* Results */}
-        {result && (
-          <div className="results-section">
-            {/* Divider */}
-            <div className="divider">
-              <span className="divider-text">Kết quả phân tích</span>
+        {/* ── STEP 2: Preview + Configure ── */}
+        {step === "preview" && (
+          <div className="space-y-6">
+            {/* File info banner */}
+            <div className="flex items-center gap-3 bg-indigo-50 border border-indigo-100 rounded-2xl px-4 py-3">
+              <CheckCircle2 className="w-5 h-5 text-indigo-600 shrink-0" />
+              <div className="flex-1 min-w-0">
+                <p className="text-sm text-indigo-800 truncate">
+                  <span className="text-indigo-600">Loaded:</span> {fileName}
+                </p>
+                <p className="text-xs text-indigo-400">{data.length} customer records ready for clustering</p>
+              </div>
+              <Badge className="bg-indigo-600 text-white rounded-full px-3 shrink-0">
+                {data.length} rows
+              </Badge>
             </div>
 
-            {/* Stats */}
-            <StatsBar clusters={result.clusters} k={result.k} />
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              {/* Data table — takes 2/3 width on large screens */}
+              <div className="lg:col-span-2">
+                <DataTable data={data} maxRows={20} />
+              </div>
+
+              {/* Cluster config — takes 1/3 width */}
+              <div className="lg:col-span-1">
+                <ClusterConfig
+                  kValue={kValue}
+                  setKValue={setKValue}
+                  onRun={handleRunClustering}
+                  onBack={handleReset}
+                  isLoading={isLoading}
+                  totalCustomers={data.length}
+                />
+              </div>
+            </div>
+
+            {/* Loading overlay */}
+            {isLoading && (
+              <div className="fixed inset-0 bg-white/60 backdrop-blur-sm z-50 flex flex-col items-center justify-center gap-4">
+                <div className="bg-white rounded-2xl shadow-xl border border-gray-100 px-8 py-6 flex flex-col items-center gap-3">
+                  <div className="w-14 h-14 rounded-2xl bg-indigo-50 flex items-center justify-center">
+                    <Loader2 className="w-7 h-7 text-indigo-600 animate-spin" />
+                  </div>
+                  <div className="text-center">
+                    <p className="text-gray-800">Running K-Means (K = {kValue})</p>
+                    <p className="text-sm text-gray-400 mt-1">{loadingMsg}</p>
+                  </div>
+                  {/* Progress dots */}
+                  <div className="flex gap-1.5 mt-1">
+                    {[0, 1, 2].map((i) => (
+                      <div
+                        key={i}
+                        className="w-2 h-2 rounded-full bg-indigo-400 animate-bounce"
+                        style={{ animationDelay: `${i * 150}ms` }}
+                      />
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ── STEP 3: Results ── */}
+        {step === "results" && clusterResults && (
+          <div className="space-y-8">
+            {/* Summary stats row */}
+            <div className="flex flex-wrap gap-3">
+              <StatCard label="Total Customers" value={data.length.toString()} sub="in dataset" />
+              <StatCard label="Clusters Found" value={numClusters.toString()} sub={`K = ${kValue}`} />
+              <StatCard
+                label="Avg. Cluster Size"
+                value={Math.round(data.length / numClusters).toString()}
+                sub="customers/cluster"
+              />
+              <StatCard
+                label="File"
+                value={fileName}
+                sub="source data"
+              />
+            </div>
 
             {/* Charts */}
-            <ClusterChart
-              clusters={result.clusters}
-              elbow={result.elbow}
-              k={result.k}
+            <ChartSection data={data} results={clusterResults} />
+
+            {/* Cluster summary cards */}
+            <ClusterResult data={data} results={clusterResults} />
+
+            {/* Filtered data table */}
+            <DataTable
+              data={data}
+              labels={clusterResults.labels}
+              filterCluster={filterCluster}
+              setFilterCluster={setFilterCluster}
             />
 
-            {/* Table */}
-            <SegmentTable clusters={result.clusters} />
+            {/* Bottom action bar */}
+            <div className="flex flex-col sm:flex-row gap-3 pb-8">
+              <Button
+                variant="outline"
+                onClick={handleReset}
+                className="rounded-xl border-gray-200 py-5 gap-2"
+              >
+                <RotateCcw className="w-4 h-4" />
+                Start New Analysis
+              </Button>
+              <Button
+                onClick={handleDownload}
+                className="flex-1 sm:flex-initial rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white py-5 gap-2"
+              >
+                <Download className="w-4 h-4" />
+                Download Results as CSV
+              </Button>
+            </div>
           </div>
         )}
       </main>
 
-      {/* Footer */}
-      <footer className="footer">
-        <span>Customer Segmentation · AI Assignment · K-Means Clustering</span>
+      {/* ── Footer ── */}
+      <footer className="border-t border-gray-100 mt-8">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4 flex items-center justify-between text-xs text-gray-300">
+          <span>Customer Segmentation Dashboard</span>
+          <span>K-Means Clustering · Built with React + Recharts</span>
+        </div>
       </footer>
-
-      <style jsx global>{`
-        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
-        html, body {
-          background: #060d1a;
-          color: #e2e8f0;
-          font-family: 'DM Sans', sans-serif;
-          min-height: 100vh;
-          -webkit-font-smoothing: antialiased;
-        }
-
-        /* Subtle grid background */
-        body::before {
-          content: '';
-          position: fixed;
-          inset: 0;
-          background-image:
-            linear-gradient(rgba(45,212,191,0.025) 1px, transparent 1px),
-            linear-gradient(90deg, rgba(45,212,191,0.025) 1px, transparent 1px);
-          background-size: 40px 40px;
-          pointer-events: none;
-          z-index: 0;
-        }
-
-        .page {
-          position: relative;
-          z-index: 1;
-          min-height: 100vh;
-          display: flex;
-          flex-direction: column;
-        }
-
-        .header {
-          border-bottom: 1px solid #0f1f35;
-          padding: 0 24px;
-        }
-
-        .header-inner {
-          max-width: 1100px;
-          margin: 0 auto;
-          height: 56px;
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-        }
-
-        .logo {
-          display: flex;
-          align-items: center;
-          gap: 8px;
-        }
-
-        .logo-mark {
-          font-size: 18px;
-          color: #2dd4bf;
-        }
-
-        .logo-text {
-          font-family: 'DM Mono', monospace;
-          font-size: 15px;
-          font-weight: 700;
-          color: #e2e8f0;
-          letter-spacing: -0.02em;
-        }
-
-        .header-meta {
-          display: flex;
-          gap: 8px;
-        }
-
-        .badge {
-          font-size: 11px;
-          font-family: 'DM Mono', monospace;
-          color: #2dd4bf;
-          background: rgba(45,212,191,0.08);
-          border: 1px solid rgba(45,212,191,0.2);
-          border-radius: 4px;
-          padding: 3px 8px;
-        }
-
-        .main {
-          flex: 1;
-          max-width: 1100px;
-          margin: 0 auto;
-          width: 100%;
-          padding: 48px 24px 80px;
-          display: flex;
-          flex-direction: column;
-          gap: 32px;
-        }
-
-        .hero {
-          display: flex;
-          flex-direction: column;
-          gap: 10px;
-        }
-
-        .hero-title {
-          font-size: clamp(24px, 4vw, 36px);
-          font-weight: 600;
-          color: #f1f5f9;
-          letter-spacing: -0.03em;
-          line-height: 1.15;
-        }
-
-        .hero-accent {
-          color: #2dd4bf;
-        }
-
-        .hero-sub {
-          color: #475569;
-          font-size: 14px;
-          font-family: 'DM Mono', monospace;
-        }
-
-        .error-box {
-          background: rgba(248, 113, 113, 0.07);
-          border: 1px solid rgba(248, 113, 113, 0.3);
-          border-radius: 10px;
-          padding: 14px 18px;
-          display: flex;
-          align-items: center;
-          gap: 10px;
-          color: #fca5a5;
-          font-size: 13px;
-        }
-
-        .error-icon {
-          font-size: 16px;
-          flex-shrink: 0;
-        }
-
-        .results-section {
-          display: flex;
-          flex-direction: column;
-          gap: 24px;
-          animation: fadeUp 0.4s ease;
-        }
-
-        @keyframes fadeUp {
-          from { opacity: 0; transform: translateY(12px); }
-          to   { opacity: 1; transform: translateY(0); }
-        }
-
-        .divider {
-          display: flex;
-          align-items: center;
-          gap: 16px;
-        }
-
-        .divider::before,
-        .divider::after {
-          content: '';
-          flex: 1;
-          height: 1px;
-          background: #1e293b;
-        }
-
-        .divider-text {
-          color: #334155;
-          font-size: 11px;
-          letter-spacing: 0.1em;
-          text-transform: uppercase;
-          font-family: 'DM Mono', monospace;
-          white-space: nowrap;
-        }
-
-        .footer {
-          text-align: center;
-          padding: 20px;
-          color: #1e293b;
-          font-size: 11px;
-          font-family: 'DM Mono', monospace;
-          border-top: 1px solid #0f1a2e;
-        }
-      `}</style>
     </div>
-  )
+  );
 }

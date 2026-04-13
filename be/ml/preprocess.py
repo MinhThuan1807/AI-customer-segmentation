@@ -13,52 +13,89 @@ def _to_numeric_eu(series: pd.Series) -> pd.Series:
     )
 
 
+def _normalize_columns(df: pd.DataFrame) -> pd.DataFrame:
+    """Chuẩn hóa tên cột theo format CSV khách hàng."""
+    aliases = {
+        'customerid': 'CustomerID',
+        'customer_id': 'CustomerID',
+        'age': 'Age',
+        'annualincome': 'AnnualIncome',
+        'annual_income': 'AnnualIncome',
+        'annual income': 'AnnualIncome',
+        'income': 'AnnualIncome',
+        'spendingscore': 'SpendingScore',
+        'spending_score': 'SpendingScore',
+        'spending score': 'SpendingScore',
+        'score': 'SpendingScore',
+        'purchasefrequency': 'PurchaseFrequency',
+        'purchase_frequency': 'PurchaseFrequency',
+        'purchase frequency': 'PurchaseFrequency',
+        'frequency': 'PurchaseFrequency',
+    }
+
+    normalized = []
+    for col in df.columns:
+        key = str(col).strip().lower()
+        normalized.append(aliases.get(key, str(col).strip()))
+
+    df = df.copy()
+    df.columns = normalized
+    return df
+
+
 def compute_rfm(df: pd.DataFrame):
-    # Chuẩn hóa tên cột
-    df.columns = df.columns.str.strip()
+    df = _normalize_columns(df)
 
-    # Ép kiểu numeric TRƯỚC mọi phép so sánh
-    df['Quantity']  = _to_numeric_eu(df['Quantity'])
-    df['UnitPrice'] = _to_numeric_eu(df['UnitPrice'])
+    required_cols = ['CustomerID', 'Age', 'AnnualIncome', 'SpendingScore', 'PurchaseFrequency']
+    missing_cols = [c for c in required_cols if c not in df.columns]
+    if missing_cols:
+        raise ValueError(
+            "Thiếu cột bắt buộc trong CSV: " + ", ".join(missing_cols)
+        )
 
-    # Parse ngày
-    df['InvoiceDate'] = pd.to_datetime(df['InvoiceDate'], dayfirst=True, errors='coerce')
+    # CustomerID: chuẩn hóa thành số nguyên dạng chuỗi
+    df['CustomerID'] = (
+        df['CustomerID']
+        .astype(str)
+        .str.strip()
+        .str.replace(r'\.0$', '', regex=True)
+    )
+    df = df[df['CustomerID'].str.match(r'^\d+$', na=False)]
 
-    # CustomerID: bỏ NaN, chuẩn hóa thành string sạch
-    df['CustomerID'] = df['CustomerID'].astype(str).str.strip().str.split('.').str[0]
-    df = df[df['CustomerID'].str.match(r'^\d+$')]  # chỉ giữ ID là số
+    # Chuẩn hóa các cột số theo định dạng EU/US
+    for col in ['Age', 'AnnualIncome', 'SpendingScore', 'PurchaseFrequency']:
+        df[col] = _to_numeric_eu(df[col])
 
-    # Bỏ các dòng thiếu dữ liệu quan trọng
-    df = df.dropna(subset=['CustomerID', 'InvoiceDate', 'UnitPrice', 'Quantity'])
-
-    # Chỉ giữ đơn hàng hợp lệ — so sánh an toàn vì đã là float
-    df = df[df['Quantity'] > 0]
-    df = df[df['UnitPrice'] > 0]
+    # Bỏ dòng lỗi dữ liệu
+    df = df.dropna(subset=required_cols)
+    df = df[
+        (df['Age'] > 0)
+        & (df['AnnualIncome'] > 0)
+        & (df['SpendingScore'] >= 0)
+        & (df['SpendingScore'] <= 100)
+        & (df['PurchaseFrequency'] > 0)
+    ]
 
     if df.empty:
         raise ValueError("Không có dữ liệu hợp lệ sau khi lọc. Kiểm tra file CSV.")
 
-    df['TotalPrice'] = df['Quantity'] * df['UnitPrice']
-
-    snapshot_date = df['InvoiceDate'].max()
-
-    rfm = df.groupby('CustomerID').agg(
-        Recency=('InvoiceDate', lambda x: (snapshot_date - x.max()).days),
-        Frequency=('InvoiceNo', 'nunique'),
-        Monetary=('TotalPrice', 'sum'),
-    ).reset_index()
-
-    # Bỏ outlier cực đoan (top 1%)
-    for col in ['Recency', 'Frequency', 'Monetary']:
-        upper = rfm[col].quantile(0.99)
-        rfm = rfm[rfm[col] <= upper]
-
-    rfm = rfm[rfm['Monetary'] > 0]
+    # Trường hợp có trùng CustomerID, gộp theo trung bình
+    customer_df = (
+        df.groupby('CustomerID', as_index=False)
+        .agg(
+            Age=('Age', 'mean'),
+            AnnualIncome=('AnnualIncome', 'mean'),
+            SpendingScore=('SpendingScore', 'mean'),
+            PurchaseFrequency=('PurchaseFrequency', 'mean'),
+        )
+    )
 
     scaler = StandardScaler()
-    rfm_scaled = scaler.fit_transform(rfm[['Recency', 'Frequency', 'Monetary']])
+    rfm_scaled = scaler.fit_transform(
+        customer_df[['Age', 'AnnualIncome', 'SpendingScore', 'PurchaseFrequency']]
+    )
 
-    return rfm, rfm_scaled
+    return customer_df, rfm_scaled
 
 
 def read_csv_auto(content: bytes) -> pd.DataFrame:
