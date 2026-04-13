@@ -1,6 +1,11 @@
-from fastapi import FastAPI, UploadFile, File, HTTPException
+from typing import List
+
+import pandas as pd
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from ml.preprocess import compute_rfm, read_csv_auto
+from pydantic import BaseModel
+
+from ml.preprocess import compute_rfm
 from ml.clustering import find_optimal_k, run_kmeans
 
 app = FastAPI()
@@ -13,28 +18,56 @@ app.add_middleware(
 )
 
 
-@app.post("/api/analyze")
-async def analyze(file: UploadFile = File(...), k: int = 4):
+class CustomerInput(BaseModel):
+    CustomerID: int | str
+    Age: float
+    AnnualIncome: float
+    SpendingScore: float
+    PurchaseFrequency: float
+
+
+class ClusterRequest(BaseModel):
+    data: List[CustomerInput]
+    k: int = 4
+
+
+def _build_response(df: pd.DataFrame, k: int):
+    customer_df, scaled = compute_rfm(df)
+    k = min(k, len(customer_df))
+
+    result_df, _ = run_kmeans(customer_df, scaled, k)
+    inertias = find_optimal_k(scaled)
+
+    labels = result_df['Cluster'].astype(int).tolist()
+    centroids = (
+        result_df
+        .groupby('Cluster')[['Age', 'AnnualIncome', 'SpendingScore', 'PurchaseFrequency']]
+        .mean()
+        .sort_index()
+        .round(4)
+        .values
+        .tolist()
+    )
+    elbow_data = [
+        {'k': k_value, 'wcss': wcss}
+        for k_value, wcss in zip(range(2, 2 + len(inertias)), inertias)
+    ]
+
+    return {
+        'labels': labels,
+        'centroids': centroids,
+        'elbowData': elbow_data,
+    }
+
+
+@app.post("/api/cluster")
+async def analyze(payload: ClusterRequest):
     try:
-        content = await file.read()
+        if not payload.data:
+            raise ValueError("Danh sách khách hàng rỗng.")
 
-        # Tự động detect separator & encoding
-        df = read_csv_auto(content)
-
-        rfm, rfm_scaled = compute_rfm(df)
-
-        # Đảm bảo k không vượt quá số khách hàng
-        k = min(k, len(rfm))
-
-        rfm_result, centers = run_kmeans(rfm, rfm_scaled, k)
-        elbow = find_optimal_k(rfm_scaled)
-
-        return {
-            "clusters": rfm_result.to_dict(orient="records"),
-            "elbow": elbow,
-            "k": k,
-            "total_customers": len(rfm_result),
-        }
+        df = pd.DataFrame([row.model_dump() for row in payload.data])
+        return _build_response(df, payload.k)
 
     except ValueError as e:
         raise HTTPException(status_code=422, detail=str(e))
