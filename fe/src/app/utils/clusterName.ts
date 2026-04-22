@@ -1,15 +1,8 @@
-/**
- * clusterNames.ts
- * ---------------
- * Assigns human-readable names and descriptions to clusters
- * based on their centroid values (income and spending score).
- *
- * Centroids format: [Age, AnnualIncome, SpendingScore, PurchaseFrequency]
- */
+
 
 import type { CustomerData, ClusterInfo } from "../types";
 
-/** One color per cluster (supports up to 10 clusters) */
+
 export const CLUSTER_COLORS = [
   "#6366f1", // Indigo
   "#f43f5e", // Rose
@@ -23,7 +16,6 @@ export const CLUSTER_COLORS = [
   "#84cc16", // Lime
 ];
 
-/** Builds a ClusterInfo object for each cluster */
 export function buildClusterInfos(
   data: CustomerData[],
   labels: number[],
@@ -33,7 +25,6 @@ export function buildClusterInfos(
   const avgIncome = centroids.reduce((s, c) => s + c[1], 0) / k;
   const avgSpending = centroids.reduce((s, c) => s + c[2], 0) / k;
 
-  // Sort clusters by composite score (income + spending) to assign names consistently
   const ranked = centroids.map((c, i) => ({ i, score: c[1] + c[2] }));
   ranked.sort((a, b) => b.score - a.score);
 
@@ -80,7 +71,6 @@ export function buildClusterInfos(
     },
   ];
 
-  // Build a mapping: original cluster index → display rank (0 = highest score)
   const rankMap: Record<number, number> = {};
   ranked.forEach(({ i }, rank) => { rankMap[i] = rank; });
 
@@ -89,7 +79,6 @@ export function buildClusterInfos(
     const rank = rankMap[id] ?? id;
     const meta = namePool[rank % namePool.length];
 
-    // Customers in this cluster
     const clusterCustomers = data.filter((_, i) => labels[i] === id);
     const avg = (field: keyof CustomerData) =>
       clusterCustomers.length > 0

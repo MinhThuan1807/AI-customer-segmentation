@@ -1,9 +1,4 @@
-/**
- * exportCSV.ts
- * ------------
- * Exports customer data WITH cluster assignments as a downloadable CSV file.
- * Adds a "Cluster" column to the original data.
- */
+
 
 import type { CustomerData } from "../types";
 
