@@ -33,8 +33,14 @@ Tạo và kích hoạt virtual environment:
 
 ```bash
 # Windows
+// Mới clone thì phải làm đủ bước
+
 python -m venv venv
 venv\Scripts\activate
+
+#gitbash
+python -m venv venv
+source venv/Scripts/activate
 
 # macOS / Linux
 python -m venv venv
