@@ -1,4 +1,4 @@
-'use client';
+"use client";
 import "./utils/suppressExtensionErrors";
 import React, { useState } from "react";
 import { UploadSection } from "@/components/UploadSection";
@@ -10,16 +10,22 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { runKMeans } from "./utils/kMeans";
 import { downloadCSV } from "./utils/exportCSV";
-import { Download, RotateCcw, BrainCircuit, CheckCircle2, Loader2 } from "lucide-react";
+import {
+  Download,
+  RotateCcw,
+  BrainCircuit,
+  CheckCircle2,
+  Loader2,
+} from "lucide-react";
 import type { CustomerData, ClusteringResult } from "./types";
 
 type Step = "upload" | "preview" | "results";
 
 function StepIndicator({ step }: { step: Step }) {
   const steps: { id: Step; label: string; num: number }[] = [
-    { id: "upload", label: "Upload Data", num: 1 },
-    { id: "preview", label: "Configure", num: 2 },
-    { id: "results", label: "Results", num: 3 },
+    { id: "upload", label: "Tải dữ liệu", num: 1 },
+    { id: "preview", label: "Cấu hình", num: 2 },
+    { id: "results", label: "Kết quả", num: 3 },
   ];
 
   const stepOrder: Record<Step, number> = { upload: 0, preview: 1, results: 2 };
@@ -46,13 +52,16 @@ function StepIndicator({ step }: { step: Step }) {
               </div>
               <span
                 className={`text-xs mt-1.5 transition-colors ${
-                  active ? "text-indigo-600" : done ? "text-gray-400" : "text-gray-300"
+                  active
+                    ? "text-indigo-600"
+                    : done
+                      ? "text-gray-400"
+                      : "text-gray-300"
                 }`}
               >
                 {s.label}
               </span>
             </div>
-
 
             {i < steps.length - 1 && (
               <div
@@ -68,23 +77,34 @@ function StepIndicator({ step }: { step: Step }) {
   );
 }
 
-function StatCard({ label, value, sub }: { label: string; value: string; sub?: string }) {
+function StatCard({
+  label,
+  value,
+  sub,
+}: {
+  label: string;
+  value: string;
+  sub?: string;
+}) {
   return (
     <div className="flex-1 min-w-0 bg-white rounded-2xl border border-gray-100 shadow-sm px-4 py-3">
       <p className="text-xs text-gray-400">{label}</p>
-      <p className="text-gray-900 mt-0.5 truncate" title={value}>{value}</p>
+      <p className="text-gray-900 mt-0.5 truncate" title={value}>
+        {value}
+      </p>
       {sub && <p className="text-xs text-gray-400 mt-0.5">{sub}</p>}
     </div>
   );
 }
-
 
 export default function App() {
   const [step, setStep] = useState<Step>("upload");
   const [data, setData] = useState<CustomerData[]>([]);
   const [fileName, setFileName] = useState<string>("");
   const [kValue, setKValue] = useState<number>(3);
-  const [clusterResults, setClusterResults] = useState<ClusteringResult | null>(null);
+  const [clusterResults, setClusterResults] = useState<ClusteringResult | null>(
+    null,
+  );
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [filterCluster, setFilterCluster] = useState<number | "all">("all");
   const [loadingMsg, setLoadingMsg] = useState<string>("");
@@ -97,24 +117,23 @@ export default function App() {
     setStep("preview");
   };
 
- 
   const handleRunClustering = async () => {
     setIsLoading(true);
-    setLoadingMsg("Initializing centroids...");
+    setLoadingMsg("Đang khởi tạo tâm cụm...");
 
     await new Promise((res) => setTimeout(res, 600));
-    setLoadingMsg("Running K-Means iterations...");
+    setLoadingMsg("Đang chạy các vòng lặp K-Means...");
     await new Promise((res) => setTimeout(res, 700));
-    setLoadingMsg("Computing elbow method...");
+    setLoadingMsg("Đang tính toán phương pháp Elbow...");
     await new Promise((res) => setTimeout(res, 500));
 
     try {
-          const response = await fetch("http://127.0.0.1:8000/api/cluster", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ data, k: kValue }),
-          });
-          const results = await response.json();
+      const response = await fetch("http://127.0.0.1:8000/api/cluster", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ data, k: kValue }),
+      });
+      const results = await response.json();
       setClusterResults(results);
       setStep("results");
     } catch (err) {
@@ -125,7 +144,6 @@ export default function App() {
     }
   };
 
-
   const handleReset = () => {
     setStep("upload");
     setData([]);
@@ -135,13 +153,14 @@ export default function App() {
     setKValue(3);
   };
 
-
   const handleDownload = () => {
     if (!clusterResults) return;
     downloadCSV(data, clusterResults.labels, `segments_k${kValue}_${fileName}`);
   };
 
-  const numClusters = clusterResults ? Math.max(...clusterResults.labels) + 1 : 0;
+  const numClusters = clusterResults
+    ? Math.max(...clusterResults.labels) + 1
+    : 0;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-indigo-50/30">
@@ -155,7 +174,9 @@ export default function App() {
               <h1 className="text-gray-900 leading-tight">
                 Customer Segmentation
               </h1>
-              <p className="text-xs text-gray-400 hidden sm:block">K-Means Clustering Analysis</p>
+              <p className="text-xs text-gray-400 hidden sm:block">
+                Phân tích phân cụm K-Means
+              </p>
             </div>
           </div>
 
@@ -168,7 +189,7 @@ export default function App() {
                 className="rounded-xl border-gray-200 text-sm gap-1.5"
               >
                 <RotateCcw className="w-3.5 h-3.5" />
-                New Analysis
+                Phân tích mới
               </Button>
               <Button
                 size="sm"
@@ -176,7 +197,7 @@ export default function App() {
                 className="rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-sm gap-1.5"
               >
                 <Download className="w-3.5 h-3.5" />
-                Download CSV
+                Tải CSV
               </Button>
             </div>
           )}
@@ -189,10 +210,11 @@ export default function App() {
         {step === "upload" && (
           <div className="flex flex-col items-center">
             <div className="text-center mb-8 max-w-xl">
-              <h2 className="text-gray-800 mb-2">Upload Your Customer Data</h2>
+              <h2 className="text-gray-800 mb-2">Tải lên dữ liệu khách hàng</h2>
               <p className="text-sm text-gray-400">
-                Upload a CSV file with customer records, or use our 200-customer demo dataset
-                to explore the full K-Means clustering pipeline instantly.
+                Tải lên file CSV chứa dữ liệu khách hàng, hoặc dùng bộ dữ liệu
+                mẫu 200 khách hàng để khám phá toàn bộ quy trình phân cụm
+                K-Means ngay lập tức.
               </p>
             </div>
             <div className="w-full max-w-2xl">
@@ -207,12 +229,14 @@ export default function App() {
               <CheckCircle2 className="w-5 h-5 text-indigo-600 shrink-0" />
               <div className="flex-1 min-w-0">
                 <p className="text-sm text-indigo-800 truncate">
-                  <span className="text-indigo-600">Loaded:</span> {fileName}
+                  <span className="text-indigo-600">Đã tải:</span> {fileName}
                 </p>
-                <p className="text-xs text-indigo-400">{data.length} customer records ready for clustering</p>
+                <p className="text-xs text-indigo-400">
+                  {data.length} bản ghi khách hàng sẵn sàng phân cụm
+                </p>
               </div>
               <Badge className="bg-indigo-600 text-white rounded-full px-3 shrink-0">
-                {data.length} rows
+                {data.length} hàng
               </Badge>
             </div>
 
@@ -240,7 +264,9 @@ export default function App() {
                     <Loader2 className="w-7 h-7 text-indigo-600 animate-spin" />
                   </div>
                   <div className="text-center">
-                    <p className="text-gray-800">Running K-Means (K = {kValue})</p>
+                    <p className="text-gray-800">
+                      Đang chạy K-Means (K = {kValue})
+                    </p>
                     <p className="text-sm text-gray-400 mt-1">{loadingMsg}</p>
                   </div>
                   <div className="flex gap-1.5 mt-1">
@@ -261,18 +287,22 @@ export default function App() {
         {step === "results" && clusterResults && (
           <div className="space-y-8">
             <div className="flex flex-wrap gap-3">
-              <StatCard label="Total Customers" value={data.length.toString()} sub="in dataset" />
-              <StatCard label="Clusters Found" value={numClusters.toString()} sub={`K = ${kValue}`} />
               <StatCard
-                label="Avg. Cluster Size"
+                label="Tổng khách hàng"
+                value={data.length.toString()}
+                sub="trong bộ dữ liệu"
+              />
+              <StatCard
+                label="Số cụm tìm được"
+                value={numClusters.toString()}
+                sub={`K = ${kValue}`}
+              />
+              <StatCard
+                label="Kích thước cụm TB"
                 value={Math.round(data.length / numClusters).toString()}
-                sub="customers/cluster"
+                sub="khách hàng/cụm"
               />
-              <StatCard
-                label="File"
-                value={fileName}
-                sub="source data"
-              />
+              <StatCard label="File" value={fileName} sub="dữ liệu nguồn" />
             </div>
 
             <ChartSection data={data} results={clusterResults} />
@@ -293,14 +323,14 @@ export default function App() {
                 className="rounded-xl border-gray-200 py-5 gap-2"
               >
                 <RotateCcw className="w-4 h-4" />
-                Start New Analysis
+                Bắt đầu phân tích mới
               </Button>
               <Button
                 onClick={handleDownload}
                 className="flex-1 sm:flex-initial rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white py-5 gap-2"
               >
                 <Download className="w-4 h-4" />
-                Download Results as CSV
+                Tải kết quả dưới dạng CSV
               </Button>
             </div>
           </div>
@@ -309,8 +339,8 @@ export default function App() {
 
       <footer className="border-t border-gray-100 mt-8">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4 flex items-center justify-between text-xs text-gray-300">
-          <span>Customer Segmentation Dashboard</span>
-          <span>K-Means Clustering · Built with React + Recharts</span>
+          <span>Bảng điều khiển phân khúc khách hàng</span>
+          <span>Phân cụm K-Means · Xây dựng với React + Recharts</span>
         </div>
       </footer>
     </div>

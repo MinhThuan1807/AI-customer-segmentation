@@ -1,16 +1,3 @@
-/**
- * ClusterResult.tsx
- * -----------------
- * Displays a summary card for each cluster.
- *
- * Each card shows:
- *  - Cluster name (e.g., "Premium Shoppers")
- *  - Short description of the segment
- *  - Number of customers in the cluster
- *  - Average income, spending, and age
- *  - Color-coded badge
- */
-
 import React from "react";
 import { Card, CardContent } from "./ui/card";
 import { Badge } from "./ui/badge";
@@ -24,7 +11,15 @@ interface ClusterResultProps {
 }
 
 /** A single stat row inside the cluster card */
-function StatRow({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
+function StatRow({
+  icon,
+  label,
+  value,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  value: string;
+}) {
   return (
     <div className="flex items-center justify-between py-1.5">
       <div className="flex items-center gap-2 text-gray-500">
@@ -47,9 +42,10 @@ export function ClusterResult({ data, results }: ClusterResultProps) {
     <div className="space-y-4">
       {/* Section header */}
       <div>
-        <h2 className="text-gray-800">Cluster Segments</h2>
+        <h2 className="text-gray-800">Phân khúc khách hàng</h2>
         <p className="text-sm text-gray-400">
-          K-Means found {k} distinct customer groups based on income, spending, age, and purchase frequency.
+          K-Means tìm thấy {k} nhóm khách hàng riêng biệt dựa trên thu nhập, chi
+          tiêu, tuổi và tần suất mua hàng.
         </p>
       </div>
 
@@ -70,7 +66,9 @@ export function ClusterResult({ data, results }: ClusterResultProps) {
               {/* Header row: name + badge */}
               <div className="flex items-start justify-between gap-2">
                 <div>
-                  <h3 className="text-sm text-gray-800 leading-tight">{cluster.name}</h3>
+                  <h3 className="text-sm text-gray-800 leading-tight">
+                    {cluster.name}
+                  </h3>
                   <p className="text-xs text-gray-400 mt-0.5 leading-snug line-clamp-2">
                     {cluster.description}
                   </p>
@@ -95,30 +93,30 @@ export function ClusterResult({ data, results }: ClusterResultProps) {
               <div className="space-y-0.5">
                 <StatRow
                   icon={<Users className="w-3.5 h-3.5" />}
-                  label="Customers"
+                  label="Khách hàng"
                   value={`${cluster.count} (${Math.round((cluster.count / data.length) * 100)}%)`}
                 />
                 <StatRow
                   icon={<DollarSign className="w-3.5 h-3.5" />}
-                  label="Avg. Income"
+                  label="Thu nhập TB"
                   value={`$${cluster.avgIncome}k`}
                 />
                 <StatRow
                   icon={<ShoppingCart className="w-3.5 h-3.5" />}
-                  label="Avg. Spending"
+                  label="Chi tiêu TB"
                   value={`${cluster.avgSpending}/100`}
                 />
                 <StatRow
                   icon={<Calendar className="w-3.5 h-3.5" />}
-                  label="Avg. Age"
-                  value={`${cluster.avgAge} yrs`}
+                  label="Tuổi TB"
+                  value={`${cluster.avgAge} tuổi`}
                 />
               </div>
 
               {/* Spending bar */}
               <div>
                 <div className="flex justify-between mb-1">
-                  <span className="text-xs text-gray-400">Spending level</span>
+                  <span className="text-xs text-gray-400">Mức chi tiêu</span>
                   <span className="text-xs" style={{ color: cluster.color }}>
                     {cluster.avgSpending}%
                   </span>

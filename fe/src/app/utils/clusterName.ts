@@ -1,7 +1,4 @@
-
-
 import type { CustomerData, ClusterInfo } from "../types";
-
 
 export const CLUSTER_COLORS = [
   "#6366f1", // Indigo
@@ -20,7 +17,7 @@ export function buildClusterInfos(
   data: CustomerData[],
   labels: number[],
   centroids: number[][],
-  k: number
+  k: number,
 ): ClusterInfo[] {
   const avgIncome = centroids.reduce((s, c) => s + c[1], 0) / k;
   const avgSpending = centroids.reduce((s, c) => s + c[2], 0) / k;
@@ -30,49 +27,60 @@ export function buildClusterInfos(
 
   const namePool: { name: string; description: string }[] = [
     {
-      name: "Premium Shoppers",
-      description: "High income and high spending — your most valuable customers. Focus on loyalty rewards.",
+      name: "Khách hàng cao cấp",
+      description:
+        "Thu nhập cao và chi tiêu nhiều — nhóm khách hàng giá trị nhất. Tập trung vào chương trình khách hàng thân thiết.",
     },
     {
-      name: "Impulsive Buyers",
-      description: "Lower income but high spending tendency. Respond well to flash sales and promotions.",
+      name: "Người mua bốc đồng",
+      description:
+        "Thu nhập thấp hơn nhưng có xu hướng chi tiêu cao. Phản ứng tốt với flash sale và khuyến mãi.",
     },
     {
-      name: "Conservative Savers",
-      description: "High income but low spending. Potential for upselling premium or exclusive products.",
+      name: "Người tiết kiệm thận trọng",
+      description:
+        "Thu nhập cao nhưng chi tiêu ít. Tiềm năng upsell sản phẩm cao cấp hoặc độc quyền.",
     },
     {
-      name: "Average Customers",
-      description: "Balanced income and spending. A broad segment with diverse needs.",
+      name: "Khách hàng trung bình",
+      description:
+        "Thu nhập và chi tiêu cân bằng. Phân khúc rộng với nhu cầu đa dạng.",
     },
     {
-      name: "Budget Shoppers",
-      description: "Price-sensitive and infrequent buyers. Respond best to discounts and value bundles.",
+      name: "Người mua tiết kiệm",
+      description:
+        "Nhạy cảm về giá và mua hàng không thường xuyên. Phản ứng tốt nhất với giảm giá và gói combo.",
     },
     {
-      name: "High Engagement",
-      description: "Frequent purchasers who stay active — great candidates for loyalty programs.",
+      name: "Mức độ tương tác cao",
+      description:
+        "Mua hàng thường xuyên và luôn hoạt động — ứng viên tuyệt vời cho chương trình khách hàng thân thiết.",
     },
     {
-      name: "Low Engagement",
-      description: "Rarely purchase and low activity. Consider re-engagement campaigns.",
+      name: "Mức độ tương tác thấp",
+      description:
+        "Hiếm khi mua hàng và ít hoạt động. Cân nhắc chiến dịch tái kết nối.",
     },
     {
-      name: "Bargain Hunters",
-      description: "Seek the best deals. Highly responsive to coupons and limited-time offers.",
+      name: "Người săn hàng giảm giá",
+      description:
+        "Tìm kiếm ưu đãi tốt nhất. Phản ứng mạnh với phiếu giảm giá và ưu đãi có thời hạn.",
     },
     {
-      name: "Luxury Seekers",
-      description: "Prefer premium brands and products regardless of price.",
+      name: "Người tìm kiếm hàng xa xỉ",
+      description: "Ưa thích thương hiệu và sản phẩm cao cấp bất kể giá cả.",
     },
     {
-      name: "Price Sensitive",
-      description: "Very sensitive to price changes — small discounts have outsized effect.",
+      name: "Nhạy cảm về giá",
+      description:
+        "Rất nhạy cảm với thay đổi giá — giảm giá nhỏ có tác động lớn.",
     },
   ];
 
   const rankMap: Record<number, number> = {};
-  ranked.forEach(({ i }, rank) => { rankMap[i] = rank; });
+  ranked.forEach(({ i }, rank) => {
+    rankMap[i] = rank;
+  });
 
   return Array.from({ length: k }, (_, id) => {
     const centroid = centroids[id];
@@ -82,7 +90,8 @@ export function buildClusterInfos(
     const clusterCustomers = data.filter((_, i) => labels[i] === id);
     const avg = (field: keyof CustomerData) =>
       clusterCustomers.length > 0
-        ? clusterCustomers.reduce((s, c) => s + (c[field] as number), 0) / clusterCustomers.length
+        ? clusterCustomers.reduce((s, c) => s + (c[field] as number), 0) /
+          clusterCustomers.length
         : 0;
 
     return {

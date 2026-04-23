@@ -52,11 +52,13 @@ def _build_response(df: pd.DataFrame, k: int):
         {'k': k_value, 'wcss': wcss}
         for k_value, wcss in zip(range(2, 2 + len(inertias)), inertias)
     ]
+    pca_coords = result_df[['x', 'y']].round(4).values.tolist()
 
     return {
         'labels': labels,
         'centroids': centroids,
         'elbowData': elbow_data,
+        'pcaCoords': pca_coords,
     }
 
 
