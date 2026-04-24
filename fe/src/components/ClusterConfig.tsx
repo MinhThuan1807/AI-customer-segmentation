@@ -1,29 +1,15 @@
-/**
- * ClusterConfig.tsx
- * -----------------
- * Step 2 of the dashboard: configure clustering parameters.
- *
- * Features:
- *  - Slider to choose K (number of clusters), range 2–10
- *  - Displays selected K value dynamically
- *  - "Run Analysis" button that triggers the clustering
- *  - Loading spinner while the API/algorithm is running
- *  - "Back" button to go back and upload a different file
- */
-
-import React from "react";
 import { Slider } from "./ui/slider";
 import { Button } from "./ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import { Loader2, Play, ArrowLeft, Info } from "lucide-react";
 
 interface ClusterConfigProps {
-  kValue: number;                  // currently selected number of clusters
-  setKValue: (k: number) => void;  // update K
-  onRun: () => void;               // trigger clustering
-  onBack: () => void;              // go back to upload
-  isLoading: boolean;              // true while clustering is running
-  totalCustomers: number;          // shown in the UI for context
+  kValue: number; // currently selected number of clusters
+  setKValue: (k: number) => void; // update K
+  onRun: () => void; // trigger clustering
+  onBack: () => void; // go back to upload
+  isLoading: boolean; // true while clustering is running
+  totalCustomers: number; // shown in the UI for context
 }
 
 export function ClusterConfig({
@@ -42,9 +28,9 @@ export function ClusterConfig({
             <Play className="w-4 h-4 text-indigo-600" />
           </div>
           <div>
-            <CardTitle className="text-base">Cluster Configuration</CardTitle>
+            <CardTitle className="text-base">Cấu hình phân cụm</CardTitle>
             <p className="text-xs text-gray-400 mt-0.5">
-              Choose how many segments to create from {totalCustomers} customers
+              Chọn số phân khúc cần tạo từ {totalCustomers} khách hàng
             </p>
           </div>
         </div>
@@ -54,9 +40,7 @@ export function ClusterConfig({
         {/* K slider */}
         <div className="space-y-4">
           <div className="flex items-center justify-between">
-            <label className="text-sm text-gray-600">
-              Number of Clusters (K)
-            </label>
+            <label className="text-sm text-gray-600">Số cụm (K)</label>
             {/* Dynamic K display bubble */}
             <div className="flex items-center gap-2">
               <div className="w-9 h-9 rounded-xl bg-indigo-600 flex items-center justify-center shadow-sm">
@@ -95,9 +79,10 @@ export function ClusterConfig({
         <div className="flex items-start gap-2 bg-amber-50 border border-amber-100 rounded-xl p-3">
           <Info className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
           <p className="text-xs text-amber-700">
-            <span className="text-amber-800">Tip:</span> Not sure which K to use? Try the{" "}
-            <span className="text-amber-800">Elbow Method</span> chart in the results to find
-            the optimal number. A good starting point is K = 3–5.
+            <span className="text-amber-800">Gợi ý:</span> Chưa biết chọn K nào?
+            Hãy thử biểu đồ{" "}
+            <span className="text-amber-800">Phương pháp Elbow</span> trong kết
+            quả để tìm số cụm tối ưu. Điểm khởi đầu tốt là K = 3–5.
           </p>
         </div>
 
@@ -105,19 +90,19 @@ export function ClusterConfig({
         <div className="grid grid-cols-2 gap-2 text-xs text-gray-500">
           <div className="flex items-center gap-1.5 bg-gray-50 rounded-lg p-2">
             <span className="w-2 h-2 rounded-full bg-indigo-400" />
-            Age
+            Tuổi
           </div>
           <div className="flex items-center gap-1.5 bg-gray-50 rounded-lg p-2">
             <span className="w-2 h-2 rounded-full bg-emerald-400" />
-            Annual Income
+            Thu nhập hàng năm
           </div>
           <div className="flex items-center gap-1.5 bg-gray-50 rounded-lg p-2">
             <span className="w-2 h-2 rounded-full bg-amber-400" />
-            Spending Score
+            Điểm chi tiêu
           </div>
           <div className="flex items-center gap-1.5 bg-gray-50 rounded-lg p-2">
             <span className="w-2 h-2 rounded-full bg-rose-400" />
-            Purchase Frequency
+            Tần suất mua hàng
           </div>
         </div>
 
@@ -130,7 +115,7 @@ export function ClusterConfig({
             className="rounded-xl border-gray-200"
           >
             <ArrowLeft className="w-4 h-4 mr-1" />
-            Back
+            Quay lại
           </Button>
 
           <Button
@@ -141,12 +126,12 @@ export function ClusterConfig({
             {isLoading ? (
               <>
                 <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                Running K-Means...
+                Đang chạy K-Means...
               </>
             ) : (
               <>
                 <Play className="w-4 h-4 mr-2" />
-                Run Analysis (K = {kValue})
+                Chạy phân tích (K = {kValue})
               </>
             )}
           </Button>

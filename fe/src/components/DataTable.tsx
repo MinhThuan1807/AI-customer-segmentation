@@ -1,14 +1,4 @@
-/**
- * DataTable.tsx
- * -------------
- * Displays customer data in a scrollable table.
- *
- * Used in TWO modes:
- *  1. Preview mode (no labels): shows raw uploaded data
- *  2. Results mode (with labels): shows data with cluster column + filter dropdown
- */
-
-import React, { useMemo } from "react";
+import  { useMemo } from "react";
 import {
   Table,
   TableBody,
@@ -32,10 +22,10 @@ import type { CustomerData } from "@/app/types";
 
 interface DataTableProps {
   data: CustomerData[];
-  labels?: number[];          // optional: cluster assignments (results mode only)
+  labels?: number[]; // optional: cluster assignments (results mode only)
   filterCluster?: number | "all";
   setFilterCluster?: (v: number | "all") => void;
-  maxRows?: number;            // limit displayed rows (default 20 in preview)
+  maxRows?: number; // limit displayed rows (default 20 in preview)
 }
 
 export function DataTable({
@@ -62,7 +52,9 @@ export function DataTable({
   }, [data, labels, filterCluster, isResultsMode, maxRows]);
 
   // Show limited rows in preview mode, all rows in results mode
-  const displayData = isResultsMode ? filteredData : filteredData.slice(0, maxRows);
+  const displayData = isResultsMode
+    ? filteredData
+    : filteredData.slice(0, maxRows);
 
   return (
     <Card className="rounded-2xl shadow-sm border border-gray-100">
@@ -74,12 +66,14 @@ export function DataTable({
             </div>
             <div>
               <CardTitle className="text-base">
-                {isResultsMode ? "Clustered Customer Data" : "Data Preview"}
+                {isResultsMode
+                  ? "Dữ liệu khách hàng đã phân cụm"
+                  : "Xem trước dữ liệu"}
               </CardTitle>
               <p className="text-xs text-gray-400 mt-0.5">
                 {isResultsMode
-                  ? `Showing ${displayData.length} of ${data.length} customers`
-                  : `First ${Math.min(data.length, maxRows)} of ${data.length} rows`}
+                  ? `Hiển thị ${displayData.length} / ${data.length} khách hàng`
+                  : `${Math.min(data.length, maxRows)} hàng đầu tiên trong tổng ${data.length} hàng`}
               </p>
             </div>
           </div>
@@ -95,13 +89,13 @@ export function DataTable({
                 }
               >
                 <SelectTrigger className="w-40 rounded-xl border-gray-200 text-sm">
-                  <SelectValue placeholder="Filter cluster" />
+                  <SelectValue placeholder="Lọc cụm" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">All Clusters</SelectItem>
+                  <SelectItem value="all">Tất cả cụm</SelectItem>
                   {uniqueClusters.map((c) => (
                     <SelectItem key={c} value={String(c)}>
-                      Cluster {c}
+                      Cụm {c}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -117,13 +111,15 @@ export function DataTable({
           <Table>
             <TableHeader>
               <TableRow className="bg-gray-50 hover:bg-gray-50">
-                <TableHead className="w-24 text-gray-600">Customer ID</TableHead>
-                <TableHead className="text-gray-600">Age</TableHead>
-                <TableHead className="text-gray-600">Annual Income (k$)</TableHead>
-                <TableHead className="text-gray-600">Spending Score</TableHead>
-                <TableHead className="text-gray-600">Purchase Freq.</TableHead>
+                <TableHead className="w-24 text-gray-600">Mã KH</TableHead>
+                <TableHead className="text-gray-600">Tuổi</TableHead>
+                <TableHead className="text-gray-600">
+                  Thu nhập hàng năm (k$)
+                </TableHead>
+                <TableHead className="text-gray-600">Điểm chi tiêu</TableHead>
+                <TableHead className="text-gray-600">Tần suất mua</TableHead>
                 {isResultsMode && (
-                  <TableHead className="text-gray-600">Cluster</TableHead>
+                  <TableHead className="text-gray-600">Cụm</TableHead>
                 )}
               </TableRow>
             </TableHeader>
@@ -133,17 +129,22 @@ export function DataTable({
                 const originalIndex = isResultsMode
                   ? data.indexOf(customer)
                   : idx;
-                const clusterLabel = isResultsMode ? labels![originalIndex] : undefined;
-                const clusterColor = clusterLabel !== undefined
-                  ? CLUSTER_COLORS[clusterLabel % CLUSTER_COLORS.length]
+                const clusterLabel = isResultsMode
+                  ? labels![originalIndex]
                   : undefined;
+                const clusterColor =
+                  clusterLabel !== undefined
+                    ? CLUSTER_COLORS[clusterLabel % CLUSTER_COLORS.length]
+                    : undefined;
 
                 return (
                   <TableRow
                     key={`${customer.CustomerID}-${idx}`}
                     className="hover:bg-gray-50 transition-colors"
                   >
-                    <TableCell className="text-gray-500 text-sm">{customer.CustomerID}</TableCell>
+                    <TableCell className="text-gray-500 text-sm">
+                      {customer.CustomerID}
+                    </TableCell>
                     <TableCell>{customer.Age}</TableCell>
                     <TableCell>${customer.AnnualIncome}k</TableCell>
                     <TableCell>
@@ -170,7 +171,7 @@ export function DataTable({
                           variant="outline"
                           className="rounded-full border text-xs px-3 py-0.5"
                         >
-                          Cluster {clusterLabel}
+                          Cụm {clusterLabel}
                         </Badge>
                       </TableCell>
                     )}
