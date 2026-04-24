@@ -1,5 +1,6 @@
 import type { CustomerData, ClusterInfo } from "../types";
 
+// Bảng màu cho từng cụm, dùng theo thứ tự id cụm
 export const CLUSTER_COLORS = [
   "#6366f1", // Indigo
   "#f43f5e", // Rose
@@ -13,81 +14,151 @@ export const CLUSTER_COLORS = [
   "#84cc16", // Lime
 ];
 
+/**
+ * Xác định tên và mô tả cho một cụm dựa trên đặc trưng của centroid.
+ * So sánh thu nhập, chi tiêu và tuổi của cụm với giá trị trung bình toàn bộ các cụm
+ * để phân loại thành 8 nhóm khách hàng khác nhau.
+ */
+function getClusterMeta(
+  income: number,
+  spending: number,
+  age: number,
+  avgIncome: number,
+  avgSpending: number,
+  avgAge: number,
+): { name: string; description: string } {
+  // Xác định cụm có thu nhập / chi tiêu cao hay thấp, và có trẻ hay không
+  const highIncome = income >= avgIncome;
+  const highSpending = spending >= avgSpending;
+  const young = age < avgAge;
+
+  if (highIncome && highSpending && young) {
+    return {
+      name: "Khách VIP trẻ",
+      description:
+        "Thu nhập cao, chi tiêu nhiều và độ tuổi trẻ — nhóm tiềm năng tăng trưởng dài hạn. Ưu tiên trải nghiệm và thương hiệu.",
+    };
+  }
+  if (highIncome && highSpending && !young) {
+    return {
+      name: "Khách VIP",
+      description:
+        "Thu nhập cao, chi tiêu nhiều — nhóm khách hàng giá trị nhất. Tập trung vào chương trình khách hàng thân thiết.",
+    };
+  }
+  if (highIncome && !highSpending && young) {
+    return {
+      name: "Người trẻ tiết kiệm",
+      description:
+        "Thu nhập cao, chi tiêu ít và còn trẻ. Có tiềm năng chuyển đổi thành khách hàng cao cấp với chiến lược đúng.",
+    };
+  }
+  if (highIncome && !highSpending && !young) {
+    return {
+      name: "Người giàu thận trọng",
+      description:
+        "Thu nhập cao nhưng chi tiêu ít. Tiềm năng bán thêm sản phẩm cao cấp hoặc độc quyền.",
+    };
+  }
+  if (!highIncome && highSpending && young) {
+    return {
+      name: "Người trẻ mua sắm nhiều",
+      description:
+        "Thu nhập thấp nhưng chi tiêu cao và trẻ tuổi. Phản ứng rất tốt với giảm giá nhanh, xu hướng và khuyến mãi.",
+    };
+  }
+  if (!highIncome && highSpending && !young) {
+    return {
+      name: "Người mua sắm tích cực",
+      description:
+        "Thu nhập không cao nhưng vẫn chi tiêu nhiều. Trung thành với thương hiệu yêu thích, phản ứng tốt với ưu đãi thành viên.",
+    };
+  }
+  if (!highIncome && !highSpending && young) {
+    return {
+      name: "Khách hàng tiềm năng",
+      description:
+        "Thu nhập và chi tiêu thấp nhưng còn trẻ. Có thể phát triển thành nhóm giá trị cao theo thời gian.",
+    };
+  }
+  // Trường hợp còn lại: thu nhập thấp, chi tiêu thấp, tuổi cao
+  return {
+    name: "Người mua hàng tiết kiệm",
+    description:
+      "Thu nhập thấp, chi tiêu ít. Nhạy cảm về giá, phản ứng tốt nhất với giảm giá và gói combo.",
+  };
+}
+
+/**
+ * Xử lý trùng tên cụm khi k lớn (ví dụ k=7 có thể có nhiều cụm cùng loại).
+ * Nếu có nhiều cụm trùng tên, thêm hậu tố La Mã (I, II, III...) để phân biệt.
+ * Các cụm trùng tên được sắp xếp theo thu nhập giảm dần trước khi gán hậu tố.
+ */
+function disambiguateName(
+  baseName: string,
+  centroid: number[],
+  duplicates: { id: number; centroid: number[] }[],
+): string {
+  // Nếu không có trùng lặp thì giữ nguyên tên gốc
+  if (duplicates.length <= 1) return baseName;
+
+  // Sắp xếp các cụm trùng tên theo thu nhập (index 1) giảm dần để gán hậu tố nhất quán
+  const sorted = [...duplicates].sort((a, b) => b.centroid[1] - a.centroid[1]);
+  const rank = sorted.findIndex((d) => d.centroid === centroid);
+
+  const suffixes = ["I", "II", "III", "IV", "V"];
+  return `${baseName} ${suffixes[rank] ?? rank + 1}`;
+}
+
+/**
+ * Hàm chính: xây dựng danh sách thông tin các cụm sau khi phân cụm K-Means.
+ * - Tính giá trị trung bình toàn cục để làm ngưỡng phân loại
+ * - Gán tên/mô tả cho từng cụm dựa trên centroid
+ * - Xử lý trùng tên nếu có
+ * - Tính các chỉ số thống kê (thu nhập TB, chi tiêu TB, tuổi TB) cho từng cụm
+ */
 export function buildClusterInfos(
   data: CustomerData[],
-  labels: number[],
-  centroids: number[][],
-  k: number,
+  labels: number[], // nhãn cụm của từng khách hàng (cùng thứ tự với data)
+  centroids: number[][], // tọa độ centroid của từng cụm [age, income, spending]
+  k: number, // số lượng cụm
 ): ClusterInfo[] {
+  // Tính trung bình thu nhập, chi tiêu, tuổi trên tất cả các centroid
   const avgIncome = centroids.reduce((s, c) => s + c[1], 0) / k;
   const avgSpending = centroids.reduce((s, c) => s + c[2], 0) / k;
+  const avgAge = centroids.reduce((s, c) => s + c[0], 0) / k;
 
-  const ranked = centroids.map((c, i) => ({ i, score: c[1] + c[2] }));
-  ranked.sort((a, b) => b.score - a.score);
+  // Bước 1: tính tên gốc cho từng cụm dựa trên centroid
+  const metas = centroids.map((centroid, id) => ({
+    id,
+    centroid,
+    meta: getClusterMeta(
+      centroid[1],
+      centroid[2],
+      centroid[0],
+      avgIncome,
+      avgSpending,
+      avgAge,
+    ),
+  }));
 
-  const namePool: { name: string; description: string }[] = [
-    {
-      name: "Khách hàng cao cấp",
-      description:
-        "Thu nhập cao và chi tiêu nhiều — nhóm khách hàng giá trị nhất. Tập trung vào chương trình khách hàng thân thiết.",
-    },
-    {
-      name: "Người mua bốc đồng",
-      description:
-        "Thu nhập thấp hơn nhưng có xu hướng chi tiêu cao. Phản ứng tốt với flash sale và khuyến mãi.",
-    },
-    {
-      name: "Người tiết kiệm thận trọng",
-      description:
-        "Thu nhập cao nhưng chi tiêu ít. Tiềm năng upsell sản phẩm cao cấp hoặc độc quyền.",
-    },
-    {
-      name: "Khách hàng trung bình",
-      description:
-        "Thu nhập và chi tiêu cân bằng. Phân khúc rộng với nhu cầu đa dạng.",
-    },
-    {
-      name: "Người mua tiết kiệm",
-      description:
-        "Nhạy cảm về giá và mua hàng không thường xuyên. Phản ứng tốt nhất với giảm giá và gói combo.",
-    },
-    {
-      name: "Mức độ tương tác cao",
-      description:
-        "Mua hàng thường xuyên và luôn hoạt động — ứng viên tuyệt vời cho chương trình khách hàng thân thiết.",
-    },
-    {
-      name: "Mức độ tương tác thấp",
-      description:
-        "Hiếm khi mua hàng và ít hoạt động. Cân nhắc chiến dịch tái kết nối.",
-    },
-    {
-      name: "Người săn hàng giảm giá",
-      description:
-        "Tìm kiếm ưu đãi tốt nhất. Phản ứng mạnh với phiếu giảm giá và ưu đãi có thời hạn.",
-    },
-    {
-      name: "Người tìm kiếm hàng xa xỉ",
-      description: "Ưa thích thương hiệu và sản phẩm cao cấp bất kể giá cả.",
-    },
-    {
-      name: "Nhạy cảm về giá",
-      description:
-        "Rất nhạy cảm với thay đổi giá — giảm giá nhỏ có tác động lớn.",
-    },
-  ];
+  // Bước 2: nhóm các cụm có cùng tên để phát hiện trùng lặp
+  const nameGroups = new Map<string, { id: number; centroid: number[] }[]>();
+  for (const { id, centroid, meta } of metas) {
+    const group = nameGroups.get(meta.name) ?? [];
+    group.push({ id, centroid });
+    nameGroups.set(meta.name, group);
+  }
 
-  const rankMap: Record<number, number> = {};
-  ranked.forEach(({ i }, rank) => {
-    rankMap[i] = rank;
-  });
+  // Bước 3: tạo ClusterInfo cho từng cụm, thêm hậu tố nếu tên bị trùng
+  return metas.map(({ id, centroid, meta }) => {
+    const group = nameGroups.get(meta.name)!;
+    const finalName = disambiguateName(meta.name, centroid, group);
 
-  return Array.from({ length: k }, (_, id) => {
-    const centroid = centroids[id];
-    const rank = rankMap[id] ?? id;
-    const meta = namePool[rank % namePool.length];
-
+    // Lọc danh sách khách hàng thuộc cụm này
     const clusterCustomers = data.filter((_, i) => labels[i] === id);
+
+    // Hàm tính trung bình một trường số trong cụm
     const avg = (field: keyof CustomerData) =>
       clusterCustomers.length > 0
         ? clusterCustomers.reduce((s, c) => s + (c[field] as number), 0) /
@@ -96,7 +167,7 @@ export function buildClusterInfos(
 
     return {
       id,
-      name: meta.name,
+      name: finalName,
       description: meta.description,
       color: CLUSTER_COLORS[id % CLUSTER_COLORS.length],
       count: clusterCustomers.length,

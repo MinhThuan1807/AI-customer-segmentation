@@ -134,10 +134,16 @@ export default function App() {
         body: JSON.stringify({ data, k: kValue }),
       });
       const results = await response.json();
+      if (!response.ok || !Array.isArray(results.labels)) {
+        throw new Error(results.detail ?? "Phản hồi từ server không hợp lệ.");
+      }
       setClusterResults(results);
       setStep("results");
     } catch (err) {
       console.error("Clustering failed:", err);
+      alert(
+        `Lỗi phân cụm: ${err instanceof Error ? err.message : "Không thể kết nối tới backend."}`,
+      );
     } finally {
       setIsLoading(false);
       setLoadingMsg("");

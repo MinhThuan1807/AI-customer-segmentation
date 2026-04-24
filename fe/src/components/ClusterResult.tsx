@@ -1,6 +1,7 @@
 import React from "react";
 import { Card, CardContent } from "./ui/card";
 import { Badge } from "./ui/badge";
+import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/tooltip";
 import { Users, DollarSign, ShoppingCart, Calendar } from "lucide-react";
 import { buildClusterInfos } from "@/app/utils/clusterName";
 import type { CustomerData, ClusteringResult } from "@/app/types";
@@ -69,9 +70,16 @@ export function ClusterResult({ data, results }: ClusterResultProps) {
                   <h3 className="text-sm text-gray-800 leading-tight">
                     {cluster.name}
                   </h3>
-                  <p className="text-xs text-gray-400 mt-0.5 leading-snug line-clamp-2">
-                    {cluster.description}
-                  </p>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <p className="text-xs text-gray-400 mt-0.5 leading-snug line-clamp-2 cursor-help">
+                        {cluster.description}
+                      </p>
+                    </TooltipTrigger>
+                    <TooltipContent className="max-w-56 text-center">
+                      {cluster.description}
+                    </TooltipContent>
+                  </Tooltip>
                 </div>
                 <Badge
                   style={{

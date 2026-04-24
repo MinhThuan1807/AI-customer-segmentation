@@ -1,15 +1,3 @@
-/**
- * ChartSection.tsx
- * ----------------
- * Visualizes clustering results with two charts:
- *
- *  1. Scatter Plot — Annual Income vs Spending Score, colored by cluster
- *     → Helps you SEE how clusters are separated in 2D space
- *
- *  2. Elbow Method Chart — WCSS vs K (line chart)
- *     → Helps you find the OPTIMAL number of clusters
- *     → Look for the "elbow" — where WCSS stops dropping sharply
- */
 
 import React from "react";
 import {
@@ -100,14 +88,17 @@ export function ChartSection({ data, results }: ChartSectionProps) {
       .filter((d) => d.cluster === clusterIdx),
   );
 
-  // Find optimal K (biggest drop in WCSS) for annotation
-  let biggestDrop = 0;
-  let elbowK = 3;
-  for (let i = 1; i < elbowData.length; i++) {
-    const drop = elbowData[i - 1].wcss - elbowData[i].wcss;
-    if (drop > biggestDrop) {
-      biggestDrop = drop;
-      elbowK = elbowData[i].k; // K after the biggest drop
+  // Find optimal K using second derivative (curvature) — more robust than biggest drop
+  let elbowK = elbowData[0]?.k ?? 3;
+  if (elbowData.length >= 3) {
+    let maxCurvature = -Infinity;
+    for (let i = 1; i < elbowData.length - 1; i++) {
+      const curvature =
+        elbowData[i - 1].wcss - 2 * elbowData[i].wcss + elbowData[i + 1].wcss;
+      if (curvature > maxCurvature) {
+        maxCurvature = curvature;
+        elbowK = elbowData[i].k;
+      }
     }
   }
 
