@@ -21,7 +21,7 @@ def find_optimal_k(rfm_scaled, max_k=10):
     if n_samples < 2:
         raise ValueError("Cần ít nhất 2 khách hàng để chạy K-Means.")
 
-    # Giới hạn max_k không vượt quá số mẫu thực tế
+    # Giới hạn max_k không vượt quá số mẫu thực tế  
     # (K-Means không thể tạo nhiều cụm hơn số điểm dữ liệu)
     safe_max_k = min(max_k, n_samples)
 
