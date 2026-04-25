@@ -28,64 +28,59 @@ function getClusterMeta(
   avgAge: number,
 ): { name: string; description: string } {
   // Xác định cụm có thu nhập / chi tiêu cao hay thấp, và có trẻ hay không
+  // avgAge tính từ dữ liệu thực nên ngưỡng "trẻ" phản ánh đúng phân phối
   const highIncome = income >= avgIncome;
   const highSpending = spending >= avgSpending;
   const young = age < avgAge;
+  // Nhãn tuổi hiển thị trong description để tránh confuse
+  const ageLabel = age < 35 ? "trẻ tuổi" : age < 45 ? "trung niên" : "lớn tuổi";
 
   if (highIncome && highSpending && young) {
     return {
-      name: "Khách VIP trẻ",
-      description:
-        "Thu nhập cao, chi tiêu nhiều và độ tuổi trẻ — nhóm tiềm năng tăng trưởng dài hạn. Ưu tiên trải nghiệm và thương hiệu.",
+      name: "Khách VIP năng động",
+      description: `Thu nhập cao, chi tiêu nhiều, ${ageLabel}. Nhóm tiềm năng tăng trưởng dài hạn — ưu tiên trải nghiệm và thương hiệu.`,
     };
   }
   if (highIncome && highSpending && !young) {
     return {
       name: "Khách VIP",
-      description:
-        "Thu nhập cao, chi tiêu nhiều — nhóm khách hàng giá trị nhất. Tập trung vào chương trình khách hàng thân thiết.",
+      description: `Thu nhập cao, chi tiêu nhiều, ${ageLabel}. Nhóm khách hàng giá trị nhất — tập trung vào chương trình khách hàng thân thiết.`,
     };
   }
   if (highIncome && !highSpending && young) {
     return {
-      name: "Người trẻ tiết kiệm",
-      description:
-        "Thu nhập cao, chi tiêu ít và còn trẻ. Có tiềm năng chuyển đổi thành khách hàng cao cấp với chiến lược đúng.",
+      name: "Người thu nhập cao tiết kiệm",
+      description: `Thu nhập cao, chi tiêu ít, ${ageLabel}. Có tiềm năng chuyển đổi thành khách hàng cao cấp với chiến lược đúng.`,
     };
   }
   if (highIncome && !highSpending && !young) {
     return {
       name: "Người giàu thận trọng",
-      description:
-        "Thu nhập cao nhưng chi tiêu ít. Tiềm năng bán thêm sản phẩm cao cấp hoặc độc quyền.",
+      description: `Thu nhập cao nhưng chi tiêu ít, ${ageLabel}. Tiềm năng bán thêm sản phẩm cao cấp hoặc độc quyền.`,
     };
   }
   if (!highIncome && highSpending && young) {
     return {
-      name: "Người trẻ mua sắm nhiều",
-      description:
-        "Thu nhập thấp nhưng chi tiêu cao và trẻ tuổi. Phản ứng rất tốt với giảm giá nhanh, xu hướng và khuyến mãi.",
+      name: "Người mua sắm nhiệt tình",
+      description: `Thu nhập thấp nhưng chi tiêu cao, ${ageLabel}. Phản ứng rất tốt với giảm giá nhanh, xu hướng và khuyến mãi.`,
     };
   }
   if (!highIncome && highSpending && !young) {
     return {
       name: "Người mua sắm tích cực",
-      description:
-        "Thu nhập không cao nhưng vẫn chi tiêu nhiều. Trung thành với thương hiệu yêu thích, phản ứng tốt với ưu đãi thành viên.",
+      description: `Thu nhập không cao nhưng vẫn chi tiêu nhiều, ${ageLabel}. Trung thành với thương hiệu yêu thích, phản ứng tốt với ưu đãi thành viên.`,
     };
   }
   if (!highIncome && !highSpending && young) {
     return {
       name: "Khách hàng tiềm năng",
-      description:
-        "Thu nhập và chi tiêu thấp nhưng còn trẻ. Có thể phát triển thành nhóm giá trị cao theo thời gian.",
+      description: `Thu nhập và chi tiêu thấp, ${ageLabel}. Có thể phát triển thành nhóm giá trị cao theo thời gian.`,
     };
   }
   // Trường hợp còn lại: thu nhập thấp, chi tiêu thấp, tuổi cao
   return {
     name: "Người mua hàng tiết kiệm",
-    description:
-      "Thu nhập thấp, chi tiêu ít. Nhạy cảm về giá, phản ứng tốt nhất với giảm giá và gói combo.",
+    description: `Thu nhập thấp, chi tiêu ít, ${ageLabel}. Nhạy cảm về giá, phản ứng tốt nhất với giảm giá và gói combo.`,
   };
 }
 
@@ -123,10 +118,13 @@ export function buildClusterInfos(
   centroids: number[][], // tọa độ centroid của từng cụm [age, income, spending]
   k: number, // số lượng cụm
 ): ClusterInfo[] {
-  // Tính trung bình thu nhập, chi tiêu, tuổi trên tất cả các centroid
+  // Tính trung bình thu nhập, chi tiêu từ centroid; tuổi từ dữ liệu thực để ngưỡng chính xác hơn
   const avgIncome = centroids.reduce((s, c) => s + c[1], 0) / k;
   const avgSpending = centroids.reduce((s, c) => s + c[2], 0) / k;
-  const avgAge = centroids.reduce((s, c) => s + c[0], 0) / k;
+  const avgAge =
+    data.length > 0
+      ? data.reduce((s, c) => s + c.Age, 0) / data.length
+      : centroids.reduce((s, c) => s + c[0], 0) / k;
 
   // Bước 1: tính tên gốc cho từng cụm dựa trên centroid
   const metas = centroids.map((centroid, id) => ({
